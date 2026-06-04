@@ -1,38 +1,20 @@
 <!DOCTYPE html>
-<html lang="no">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibrasjonstest</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 100px;
-        }
-
-        button {
-            font-size: 20px;
-            padding: 15px 30px;
-            cursor: pointer;
-        }
-    </style>
-</head>
+<html>
 <body>
+<button onclick="testVibrate()">Test</button>
+<p id="out"></p>
 
-    <h1>Vibrasjonstest</h1>
-    <button onclick="vibratePhone()">Vibrer telefonen</button>
+<script>
+function testVibrate() {
+  document.getElementById("out").textContent =
+    "Supported: " + ("vibrate" in navigator);
 
-    <script>
-        function vibratePhone() {
-            if ("vibrate" in navigator) {
-                // Vibrer i 1 sekund
-                navigator.vibrate(1000);
-            } else {
-                alert("Vibration API støttes ikke på denne enheten.");
-            }
-        }
-    </script>
-
+  if ("vibrate" in navigator) {
+    const result = navigator.vibrate(500);
+    document.getElementById("out").textContent +=
+      "\nReturned: " + result;
+  }
+}
+</script>
 </body>
 </html>

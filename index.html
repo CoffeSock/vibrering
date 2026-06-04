@@ -4,89 +4,60 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Phone GPS Tracker</title>
+<title>GPS Tracker</title>
 
 <style>
 body {
     margin: 0;
     padding: 16px;
-    font-family: Arial, sans-serif;
+    font-family: Arial;
     background: #f5f5f5;
-}
-
-h1 {
-    text-align: center;
 }
 
 button {
     width: 100%;
-    min-height: 65px;
+    min-height: 60px;
     font-size: 20px;
     margin-bottom: 12px;
     border: none;
     border-radius: 12px;
 }
 
-#startBtn {
-    background: #4caf50;
-    color: white;
-}
-
-#stopBtn {
-    background: #f44336;
-    color: white;
-}
-
-#vibrateBtn {
-    background: #2196f3;
-    color: white;
-}
+#startBtn { background: #4caf50; color: white; }
+#stopBtn { background: #f44336; color: white; }
+#vibrateBtn { background: #2196f3; color: white; }
 
 #status {
     background: white;
     padding: 16px;
     border-radius: 12px;
-    font-size: 18px;
     white-space: pre-wrap;
 }
 </style>
 </head>
+
 <body>
 
 <h1>GPS Tracker</h1>
 
-<button id="startBtn" onclick="startTracking()">
-Start Tracking
-</button>
+<button id="startBtn" onclick="startTracking()">Start Tracking</button>
+<button id="stopBtn" onclick="stopTracking()">Stop Tracking</button>
+<button id="vibrateBtn" onclick="vibratePhone()">Test Vibration</button>
 
-<button id="stopBtn" onclick="stopTracking()">
-Stop Tracking
-</button>
-
-<button id="vibrateBtn" onclick="vibratePhone()">
-Test Vibration
-</button>
-
-<div id="status">
-Waiting...
-</div>
+<div id="status">Waiting...</div>
 
 <script type="module">
 
-import { initializeApp }
-from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 import {
-    getFirestore,
-    doc,
-    setDoc
-}
-from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+  getFirestore,
+  doc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
 /* FIREBASE CONFIG */
-
 const firebaseConfig = {
-    apiKey: "AIzaSyAaEwiTK79c0fMuDwvE1Oxuox-LiNpxJ6o",
+ apiKey: "AIzaSyAaEwiTK79c0fMuDwvE1Oxuox-LiNpxJ6o",
 
   authDomain: "tracker-4cc60.firebaseapp.com",
 
@@ -105,121 +76,100 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let watchId = null;
+const statusBox = document.getElementById("status");
 
-const statusBox =
-document.getElementById("status");
-
-let deviceName =
-localStorage.getItem("deviceName");
+let deviceName = localStorage.getItem("deviceName");
 
 if (!deviceName) {
-
-    deviceName = prompt(
-        "Enter a device name"
-    ) || "Unknown Device";
-
-    localStorage.setItem(
-        "deviceName",
-        deviceName
-    );
+  deviceName = prompt("Enter device name") || "Unknown";
+  localStorage.setItem("deviceName", deviceName);
 }
 
-window.vibratePhone = function() {
-
-    if ("vibrate" in navigator) {
-        navigator.vibrate([200,100,200]);
-    }
+/* VIBRATION */
+window.vibratePhone = function () {
+  if ("vibrate" in navigator) {
+    navigator.vibrate([200, 100, 200]);
+  }
 };
 
-window.startTracking = function() {
+/* START */
+window.startTracking = async function () {
 
-    if (!navigator.geolocation) {
+  vibratePhone();
 
-        statusBox.textContent =
-            "Geolocation not supported.";
+  if (!navigator.geolocation) {
+    statusBox.textContent = "Geolocation not supported.";
+    return;
+  }
 
-        return;
-    }
+  /* FORCE ONLINE IMMEDIATELY */
+  await setDoc(doc(db, "tracking", deviceName), {
+    name: deviceName,
+    status: "active",
+    timestamp: Date.now()
+  });
 
-    vibratePhone();
+  watchId = navigator.geolocation.watchPosition(
+    async (pos) => {
 
-    watchId =
-    navigator.geolocation.watchPosition(
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const acc = pos.coords.accuracy;
 
-        async (position) => {
-
-            const lat =
-            position.coords.latitude;
-
-            const lng =
-            position.coords.longitude;
-
-            const accuracy =
-            position.coords.accuracy;
-
-            statusBox.textContent =
+      statusBox.textContent =
 `Device: ${deviceName}
 
 Latitude: ${lat}
 Longitude: ${lng}
-Accuracy: ${accuracy} m
+Accuracy: ${acc} m
 
-Updated:
-${new Date().toLocaleTimeString()}`;
+Status: ACTIVE`;
 
-            try {
+      await setDoc(doc(db, "tracking", deviceName), {
+        name: deviceName,
+        latitude: lat,
+        longitude: lng,
+        accuracy: acc,
+        status: "active",
+        timestamp: Date.now()
+      });
+    },
 
-                await setDoc(
-                    doc(
-                        db,
-                        "tracking",
-                        deviceName
-                    ),
-                    {
-                        name: deviceName,
-                        latitude: lat,
-                        longitude: lng,
-                        accuracy: accuracy,
-                        timestamp: Date.now()
-                    }
-                );
+    async (error) => {
 
-            } catch(err) {
+      statusBox.textContent = "GPS ERROR: " + error.message;
 
-                statusBox.textContent +=
-                    "\n\nFirebase Error:\n" +
-                    err.message;
-            }
-        },
+      await setDoc(doc(db, "tracking", deviceName), {
+        name: deviceName,
+        status: "error",
+        timestamp: Date.now(),
+        lastError: error.message
+      });
+    },
 
-        (error) => {
-
-            statusBox.textContent =
-                "GPS Error:\n" +
-                error.message;
-        },
-
-        {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 10000
-        }
-    );
+    {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 10000
+    }
+  );
 };
 
-window.stopTracking = function() {
+/* STOP */
+window.stopTracking = async function () {
 
-    if (watchId !== null) {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
 
-        navigator.geolocation.clearWatch(
-            watchId
-        );
+  statusBox.textContent = "Tracking STOPPED";
 
-        watchId = null;
-
-        statusBox.textContent =
-            "Tracking stopped.";
-    }
+  await setDoc(doc(db, "tracking", deviceName), {
+    name: deviceName,
+    status: "stopped",
+    timestamp: Date.now()
+  });
 };
 
 </script>

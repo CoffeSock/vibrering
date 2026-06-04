@@ -1,20 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GPS + Vibration Test</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 40px;
+}
+
+button {
+    font-size: 18px;
+    padding: 12px 24px;
+    margin: 10px;
+}
+
+#output {
+    margin-top: 20px;
+    white-space: pre-wrap;
+}
+</style>
+</head>
 <body>
-<button onclick="testVibrate()">Test</button>
-<p id="out"></p>
+
+<h1>GPS + Vibration Test</h1>
+
+<button onclick="startTracking()">Start Tracking</button>
+<button onclick="stopTracking()">Stop Tracking</button>
+<button onclick="vibratePhone()">Vibrate</button>
+
+<div id="output">Not tracking.</div>
 
 <script>
-function testVibrate() {
-  document.getElementById("out").textContent =
-    "Supported: " + ("vibrate" in navigator);
+let watchId = null;
 
-  if ("vibrate" in navigator) {
-    const result = navigator.vibrate(500);
-    document.getElementById("out").textContent +=
-      "\nReturned: " + result;
-  }
+function vibratePhone() {
+    if ("vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+    }
+}
+
+function startTracking() {
+    const output = document.getElementById("output");
+
+    if (!navigator.geolocation) {
+        output.textContent = "Geolocation is not supported.";
+        return;
+    }
+
+    vibratePhone();
+
+    watchId = navigator.geolocation.watchPosition(
+        (position) => {
+            output.textContent =
+                `Latitude: ${position.coords.latitude}
+Longitude: ${position.coords.longitude}
+Accuracy: ${position.coords.accuracy} meters
+Timestamp: ${new Date(position.timestamp).toLocaleString()}`;
+        },
+        (error) => {
+            output.textContent = "Location error: " + error.message;
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000
+        }
+    );
+}
+
+function stopTracking() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        document.getElementById("output").textContent =
+            "Tracking stopped.";
+    }
 }
 </script>
+
 </body>
 </html>

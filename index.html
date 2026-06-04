@@ -3,38 +3,108 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GPS + Vibration Test</title>
+
+<title>GPS Tracker</title>
+
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet/dist/leaflet.css"
+/>
+
 <style>
 body {
+    margin: 0;
     font-family: Arial, sans-serif;
-    text-align: center;
-    margin: 40px;
 }
 
-button {
-    font-size: 18px;
-    padding: 12px 24px;
-    margin: 10px;
+#controls {
+    padding: 10px;
 }
 
-#output {
-    margin-top: 20px;
+#map {
+    height: 70vh;
+}
+
+#status {
+    padding: 10px;
     white-space: pre-wrap;
 }
 </style>
 </head>
 <body>
 
-<h1>GPS + Vibration Test</h1>
+<div id="controls">
+    <button onclick="startTracking()">Start Tracking</button>
+    <button onclick="stopTracking()">Stop Tracking</button>
+</div>
 
-<button onclick="startTracking()">Start Tracking</button>
-<button onclick="stopTracking()">Stop Tracking</button>
-<button onclick="vibratePhone()">Vibrate</button>
+<div id="status">
+Waiting...
+</div>
 
-<div id="output">Not tracking.</div>
+<div id="map"></div>
 
-<script>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  onSnapshot
+}
+from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+/* ==========================
+   YOUR FIREBASE CONFIG HERE
+   ========================== */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAaEwiTK79c0fMuDwvE1Oxuox-LiNpxJ6o",
+
+  authDomain: "tracker-4cc60.firebaseapp.com",
+
+  projectId: "tracker-4cc60",
+
+  storageBucket: "tracker-4cc60.firebasestorage.app",
+
+  messagingSenderId: "1057848421394",
+
+  appId: "1:1057848421394:web:e0c94714ece72b77f2fccb",
+
+  measurementId: "G-0TWTRSLJCG"
+
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 let watchId = null;
+
+const status = document.getElementById("status");
+
+/* ==========================
+   LEAFLET MAP
+   ========================== */
+
+const map = L.map("map").setView([0, 0], 15);
+
+L.tileLayer(
+  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    attribution: "&copy; OpenStreetMap"
+  }
+).addTo(map);
+
+const marker = L.marker([0, 0]).addTo(map);
+
+/* ==========================
+   VIBRATION
+   ========================== */
 
 function vibratePhone() {
     if ("vibrate" in navigator) {
@@ -42,43 +112,118 @@ function vibratePhone() {
     }
 }
 
-function startTracking() {
-    const output = document.getElementById("output");
+/* ==========================
+   START TRACKING
+   ========================== */
+
+window.startTracking = function() {
 
     if (!navigator.geolocation) {
-        output.textContent = "Geolocation is not supported.";
+        status.textContent =
+            "Geolocation not supported.";
         return;
     }
 
     vibratePhone();
 
-    watchId = navigator.geolocation.watchPosition(
-        (position) => {
-            output.textContent =
-                `Latitude: ${position.coords.latitude}
-Longitude: ${position.coords.longitude}
-Accuracy: ${position.coords.accuracy} meters
-Timestamp: ${new Date(position.timestamp).toLocaleString()}`;
+    watchId =
+    navigator.geolocation.watchPosition(
+
+        async (position) => {
+
+            const lat =
+                position.coords.latitude;
+
+            const lng =
+                position.coords.longitude;
+
+            const accuracy =
+                position.coords.accuracy;
+
+            status.textContent =
+`Latitude: ${lat}
+Longitude: ${lng}
+Accuracy: ${accuracy} m
+Updated: ${new Date().toLocaleTimeString()}`;
+
+            marker.setLatLng([lat, lng]);
+
+            map.setView([lat, lng]);
+
+            try {
+
+                await setDoc(
+                    doc(db, "tracking", "phone"),
+                    {
+                        latitude: lat,
+                        longitude: lng,
+                        accuracy: accuracy,
+                        timestamp: Date.now()
+                    }
+                );
+
+            } catch (err) {
+
+                console.error(err);
+
+                status.textContent +=
+                    "\n\nFirebase Error:\n" +
+                    err.message;
+            }
         },
+
         (error) => {
-            output.textContent = "Location error: " + error.message;
+            status.textContent =
+                "GPS Error:\n" +
+                error.message;
         },
+
         {
             enableHighAccuracy: true,
             maximumAge: 0,
             timeout: 10000
         }
     );
-}
+};
 
-function stopTracking() {
+/* ==========================
+   STOP TRACKING
+   ========================== */
+
+window.stopTracking = function() {
+
     if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
+
+        navigator.geolocation.clearWatch(
+            watchId
+        );
+
         watchId = null;
-        document.getElementById("output").textContent =
+
+        status.textContent =
             "Tracking stopped.";
     }
-}
+};
+
+/* ==========================
+   LIVE FIREBASE LISTENER
+   ========================== */
+
+onSnapshot(
+    doc(db, "tracking", "phone"),
+    (snapshot) => {
+
+        const data = snapshot.data();
+
+        if (!data) return;
+
+        marker.setLatLng([
+            data.latitude,
+            data.longitude
+        ]);
+    }
+);
+
 </script>
 
 </body>

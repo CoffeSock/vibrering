@@ -4,47 +4,72 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>GPS Tracker</title>
-
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet/dist/leaflet.css"
-/>
+<title>Phone GPS Tracker</title>
 
 <style>
 body {
     margin: 0;
+    padding: 16px;
     font-family: Arial, sans-serif;
+    background: #f5f5f5;
 }
 
-#controls {
-    padding: 10px;
+h1 {
+    text-align: center;
 }
 
-#map {
-    height: 70vh;
+button {
+    width: 100%;
+    min-height: 65px;
+    font-size: 20px;
+    margin-bottom: 12px;
+    border: none;
+    border-radius: 12px;
+}
+
+#startBtn {
+    background: #4caf50;
+    color: white;
+}
+
+#stopBtn {
+    background: #f44336;
+    color: white;
+}
+
+#vibrateBtn {
+    background: #2196f3;
+    color: white;
 }
 
 #status {
-    padding: 10px;
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 18px;
     white-space: pre-wrap;
 }
 </style>
 </head>
 <body>
 
-<div id="controls">
-    <button onclick="startTracking()">Start Tracking</button>
-    <button onclick="stopTracking()">Stop Tracking</button>
-</div>
+<h1>GPS Tracker</h1>
+
+<button id="startBtn" onclick="startTracking()">
+Start Tracking
+</button>
+
+<button id="stopBtn" onclick="stopTracking()">
+Stop Tracking
+</button>
+
+<button id="vibrateBtn" onclick="vibratePhone()">
+Test Vibration
+</button>
 
 <div id="status">
 Waiting...
 </div>
-
-<div id="map"></div>
-
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script type="module">
 
@@ -52,19 +77,16 @@ import { initializeApp }
 from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 
 import {
-  getFirestore,
-  doc,
-  setDoc,
-  onSnapshot
+    getFirestore,
+    doc,
+    setDoc
 }
 from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
-/* ==========================
-   YOUR FIREBASE CONFIG HERE
-   ========================== */
+/* FIREBASE CONFIG */
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAaEwiTK79c0fMuDwvE1Oxuox-LiNpxJ6o",
+    apiKey: "AIzaSyAaEwiTK79c0fMuDwvE1Oxuox-LiNpxJ6o",
 
   authDomain: "tracker-4cc60.firebaseapp.com",
 
@@ -77,7 +99,6 @@ const firebaseConfig = {
   appId: "1:1057848421394:web:e0c94714ece72b77f2fccb",
 
   measurementId: "G-0TWTRSLJCG"
-
 };
 
 const app = initializeApp(firebaseConfig);
@@ -85,42 +106,38 @@ const db = getFirestore(app);
 
 let watchId = null;
 
-const status = document.getElementById("status");
+const statusBox =
+document.getElementById("status");
 
-/* ==========================
-   LEAFLET MAP
-   ========================== */
+let deviceName =
+localStorage.getItem("deviceName");
 
-const map = L.map("map").setView([0, 0], 15);
+if (!deviceName) {
 
-L.tileLayer(
-  "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    attribution: "&copy; OpenStreetMap"
-  }
-).addTo(map);
+    deviceName = prompt(
+        "Enter a device name"
+    ) || "Unknown Device";
 
-const marker = L.marker([0, 0]).addTo(map);
-
-/* ==========================
-   VIBRATION
-   ========================== */
-
-function vibratePhone() {
-    if ("vibrate" in navigator) {
-        navigator.vibrate([200, 100, 200]);
-    }
+    localStorage.setItem(
+        "deviceName",
+        deviceName
+    );
 }
 
-/* ==========================
-   START TRACKING
-   ========================== */
+window.vibratePhone = function() {
+
+    if ("vibrate" in navigator) {
+        navigator.vibrate([200,100,200]);
+    }
+};
 
 window.startTracking = function() {
 
     if (!navigator.geolocation) {
-        status.textContent =
+
+        statusBox.textContent =
             "Geolocation not supported.";
+
         return;
     }
 
@@ -132,29 +149,34 @@ window.startTracking = function() {
         async (position) => {
 
             const lat =
-                position.coords.latitude;
+            position.coords.latitude;
 
             const lng =
-                position.coords.longitude;
+            position.coords.longitude;
 
             const accuracy =
-                position.coords.accuracy;
+            position.coords.accuracy;
 
-            status.textContent =
-`Latitude: ${lat}
+            statusBox.textContent =
+`Device: ${deviceName}
+
+Latitude: ${lat}
 Longitude: ${lng}
 Accuracy: ${accuracy} m
-Updated: ${new Date().toLocaleTimeString()}`;
 
-            marker.setLatLng([lat, lng]);
-
-            map.setView([lat, lng]);
+Updated:
+${new Date().toLocaleTimeString()}`;
 
             try {
 
                 await setDoc(
-                    doc(db, "tracking", "phone"),
+                    doc(
+                        db,
+                        "tracking",
+                        deviceName
+                    ),
                     {
+                        name: deviceName,
                         latitude: lat,
                         longitude: lng,
                         accuracy: accuracy,
@@ -162,18 +184,17 @@ Updated: ${new Date().toLocaleTimeString()}`;
                     }
                 );
 
-            } catch (err) {
+            } catch(err) {
 
-                console.error(err);
-
-                status.textContent +=
+                statusBox.textContent +=
                     "\n\nFirebase Error:\n" +
                     err.message;
             }
         },
 
         (error) => {
-            status.textContent =
+
+            statusBox.textContent =
                 "GPS Error:\n" +
                 error.message;
         },
@@ -186,10 +207,6 @@ Updated: ${new Date().toLocaleTimeString()}`;
     );
 };
 
-/* ==========================
-   STOP TRACKING
-   ========================== */
-
 window.stopTracking = function() {
 
     if (watchId !== null) {
@@ -200,29 +217,10 @@ window.stopTracking = function() {
 
         watchId = null;
 
-        status.textContent =
+        statusBox.textContent =
             "Tracking stopped.";
     }
 };
-
-/* ==========================
-   LIVE FIREBASE LISTENER
-   ========================== */
-
-onSnapshot(
-    doc(db, "tracking", "phone"),
-    (snapshot) => {
-
-        const data = snapshot.data();
-
-        if (!data) return;
-
-        marker.setLatLng([
-            data.latitude,
-            data.longitude
-        ]);
-    }
-);
 
 </script>
 
